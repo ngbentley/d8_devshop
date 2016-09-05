@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * @param array $info
+ * @param \Drupal\Core\Extension\Extension $file
+ * @param $type
+ */
+function composer_deploy_system_info_alter(array &$info, \Drupal\Core\Extension\Extension $file, $type) {
+  $handler = &drupal_static(__FUNCTION__);
+
+  if (!isset($handler)) {
+    $handler = \Drupal\composer_deploy\ComposerDeployHandler::fromVendorDir(\Drupal::config('composer_deploy.settings')->get('vendor_dir'));
+  }
+
+  if (empty($info['version'])) {
+    $project = basename($file->getFilename(), '.info.yml');
+    $package = $handler->getPackage($project);
+    if ($package) {
+      $info['project'] = $project;
+      if (isset($package['extra']['drupal']['version'])) {
+        $info['version'] = $package['extra']['drupal']['version'];
+      }
+      if (isset($package['extra']['drupal']['datestamp'])) {
+        $info['datestamp'] = $package['extra']['drupal']['datestamp'];
+      }
+
+      // Fallback to other composer metadata
+      if (empty($info['datestamp'])) {
+        $info['datestamp'] = strtotime($package['time']);
+      }
+      if (empty($info['version']) && substr($package['version'], 0, 4) == 'dev-') {
+        $info['version'] = substr($package['version'], 4) . '-dev';
+      }
+      elseif (empty($info['version'])) {
+        /**
+         * @todo: Handle mode version constraints.
+         */
+        $info['version'] = 'dev';
+      }
+    }
+  }
+}
