@@ -21,7 +21,7 @@
         "php": "^5.5.9 || ^7.0",
         "composer/installers": "^1.0.20",
         "drupal/core": "~8.1",
-        "drupal/console": "~1.0",
+        
         "drupal/drupal-library-installer-plugin": "^0.3.0",
         "drupal/composer_deploy": "^1.0",
         "drupal/eck": "~1.0@alpha"
