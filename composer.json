@@ -23,7 +23,8 @@
         "drupal/core": "~8.1",
         "drupal/console": "~1.0",
         "drupal/drupal-library-installer-plugin": "^0.3.0",
-        "drupal/composer_deploy": "^1.0"
+        "drupal/composer_deploy": "^1.0",
+        "drupal/eck": "~1.0@alpha"
     },
     "replace": {
         "drupal/drupal": "~8.1"
