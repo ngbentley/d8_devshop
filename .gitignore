@@ -3,4 +3,4 @@ web/modules
 web/themes
 web/profiles
 web/libraries
-web/scripts
+web/core/scripts
