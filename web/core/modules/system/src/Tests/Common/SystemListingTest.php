@@ -3,7 +3,7 @@
 namespace Drupal\system\Tests\Common;
 
 use Drupal\Core\Extension\ExtensionDiscovery;
-use Drupal\simpletest\KernelTestBase;
+use Drupal\KernelTests\KernelTestBase;
 
 /**
  * Tests scanning system directories in drupal_system_listing().
@@ -49,6 +49,28 @@ class SystemListingTest extends KernelTestBase {
         '@expected' => $expected_uri,
       )));
     }
+  }
+
+  /**
+   * Tests that directories matching file_scan_ignore_directories are ignored
+   */
+  public function testFileScanIgnoreDirectory() {
+    $listing = new ExtensionDiscovery(\Drupal::root(), FALSE);
+    $listing->setProfileDirectories(array('core/profiles/testing'));
+    $files = $listing->scan('module');
+    $this->assertArrayHasKey('drupal_system_listing_compatible_test', $files);
+
+    // Reset the static to force a rescan of the directories.
+    $reflected_class = new \ReflectionClass(ExtensionDiscovery::class);
+    $reflected_property = $reflected_class->getProperty('files');
+    $reflected_property->setAccessible(TRUE);
+    $reflected_property->setValue($reflected_class, []);
+
+    $this->setSetting('file_scan_ignore_directories', ['drupal_system_listing_compatible_test']);
+    $listing = new ExtensionDiscovery(\Drupal::root(), FALSE);
+    $listing->setProfileDirectories(array('core/profiles/testing'));
+    $files = $listing->scan('module');
+    $this->assertArrayNotHasKey('drupal_system_listing_compatible_test', $files);
   }
 
 }

@@ -174,6 +174,13 @@ class Migration extends PluginBase implements MigrationInterface, RequirementsIn
   protected $requirements = [];
 
   /**
+   * An optional list of tags, used by the plugin manager for filtering.
+   *
+   * @var array
+   */
+  protected $migration_tags = [];
+
+  /**
    * These migrations, if run, must be executed before this migration.
    *
    * These are different from the configuration dependencies. Migration
@@ -268,16 +275,16 @@ class Migration extends PluginBase implements MigrationInterface, RequirementsIn
    *   The plugin definition.
    * @param \Drupal\migrate\Plugin\MigrationPluginManagerInterface $migration_plugin_manager
    *   The migration plugin manager.
-   * @param \Drupal\migrate\Plugin\MigratePluginManager $source_plugin_manager
+   * @param \Drupal\migrate\Plugin\MigratePluginManagerInterface $source_plugin_manager
    *   The source migration plugin manager.
-   * @param \Drupal\migrate\Plugin\MigratePluginManager $process_plugin_manager
+   * @param \Drupal\migrate\Plugin\MigratePluginManagerInterface $process_plugin_manager
    *   The process migration plugin manager.
    * @param \Drupal\migrate\Plugin\MigrateDestinationPluginManager $destination_plugin_manager
    *   The destination migration plugin manager.
-   * @param \Drupal\migrate\Plugin\MigratePluginManager $idmap_plugin_manager
+   * @param \Drupal\migrate\Plugin\MigratePluginManagerInterface $idmap_plugin_manager
    *   The ID map migration plugin manager.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, MigrationPluginManagerInterface $migration_plugin_manager, MigratePluginManager $source_plugin_manager, MigratePluginManager $process_plugin_manager, MigrateDestinationPluginManager $destination_plugin_manager, MigratePluginManager $idmap_plugin_manager) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, MigrationPluginManagerInterface $migration_plugin_manager, MigratePluginManagerInterface $source_plugin_manager, MigratePluginManagerInterface $process_plugin_manager, MigrateDestinationPluginManager $destination_plugin_manager, MigratePluginManagerInterface $idmap_plugin_manager) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->migrationPluginManager = $migration_plugin_manager;
     $this->sourcePluginManager = $source_plugin_manager;
@@ -662,7 +669,30 @@ class Migration extends PluginBase implements MigrationInterface, RequirementsIn
    * {@inheritdoc}
    */
   public function getMigrationDependencies() {
-    return ($this->migration_dependencies ?: []) + ['required' => [], 'optional' => []];
+    $this->migration_dependencies = ($this->migration_dependencies ?: []) + ['required' => [], 'optional' => []];
+    $this->migration_dependencies['optional'] = array_unique(array_merge($this->migration_dependencies['optional'], $this->findMigrationDependencies($this->process)));
+    return $this->migration_dependencies;
+  }
+
+  /**
+   * Find migration dependencies from the migration and the iterator plugins.
+   *
+   * @param $process
+   * @return array
+   */
+  protected function findMigrationDependencies($process) {
+    $return = [];
+    foreach ($this->getProcessNormalized($process) as $process_pipeline) {
+      foreach ($process_pipeline as $plugin_configuration) {
+        if ($plugin_configuration['plugin'] == 'migration') {
+          $return = array_merge($return, (array) $plugin_configuration['migration']);
+        }
+        if ($plugin_configuration['plugin'] == 'iterator') {
+          $return = array_merge($return, $this->findMigrationDependencies($plugin_configuration['process']));
+        }
+      }
+    }
+    return $return;
   }
 
   /**
@@ -711,6 +741,13 @@ class Migration extends PluginBase implements MigrationInterface, RequirementsIn
    */
   public function getDestinationIds() {
     return $this->destinationIds;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getMigrationTags() {
+    return $this->migration_tags;
   }
 
 }

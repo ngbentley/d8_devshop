@@ -177,7 +177,7 @@ class MigrateExecutable implements MigrateExecutableInterface {
         )), 'error');
       return MigrationInterface::RESULT_FAILED;
     }
-    $this->getEventDispatcher()->dispatch(MigrateEvents::PRE_IMPORT, new MigrateImportEvent($this->migration));
+    $this->getEventDispatcher()->dispatch(MigrateEvents::PRE_IMPORT, new MigrateImportEvent($this->migration, $this->message));
 
     // Knock off migration if the requirements haven't been met.
     try {
@@ -185,11 +185,17 @@ class MigrateExecutable implements MigrateExecutableInterface {
     }
     catch (RequirementsException $e) {
       $this->message->display(
-        $this->t('Migration @id did not meet the requirements. @message @requirements', array(
-          '@id' => $this->migration->id(),
-          '@message' => $e->getMessage(),
-          '@requirements' => $e->getRequirementsString(),
-        )), 'error');
+        $this->t(
+          'Migration @id did not meet the requirements. @message @requirements',
+          array(
+            '@id' => $this->migration->id(),
+            '@message' => $e->getMessage(),
+            '@requirements' => $e->getRequirementsString(),
+          )
+        ),
+        'error'
+      );
+
       return MigrationInterface::RESULT_FAILED;
     }
 
@@ -229,9 +235,9 @@ class MigrateExecutable implements MigrateExecutableInterface {
 
       if ($save) {
         try {
-          $this->getEventDispatcher()->dispatch(MigrateEvents::PRE_ROW_SAVE, new MigratePreRowSaveEvent($this->migration, $row));
+          $this->getEventDispatcher()->dispatch(MigrateEvents::PRE_ROW_SAVE, new MigratePreRowSaveEvent($this->migration, $this->message, $row));
           $destination_id_values = $destination->import($row, $id_map->lookupDestinationId($this->sourceIdValues));
-          $this->getEventDispatcher()->dispatch(MigrateEvents::POST_ROW_SAVE, new MigratePostRowSaveEvent($this->migration, $row, $destination_id_values));
+          $this->getEventDispatcher()->dispatch(MigrateEvents::POST_ROW_SAVE, new MigratePostRowSaveEvent($this->migration, $this->message, $row, $destination_id_values));
           if ($destination_id_values) {
             // We do not save an idMap entry for config.
             if ($destination_id_values !== TRUE) {
@@ -288,7 +294,7 @@ class MigrateExecutable implements MigrateExecutableInterface {
       }
     }
 
-    $this->getEventDispatcher()->dispatch(MigrateEvents::POST_IMPORT, new MigrateImportEvent($this->migration));
+    $this->getEventDispatcher()->dispatch(MigrateEvents::POST_IMPORT, new MigrateImportEvent($this->migration, $this->message));
     $this->migration->setStatus(MigrationInterface::STATUS_IDLE);
     return $return;
   }
@@ -328,6 +334,12 @@ class MigrateExecutable implements MigrateExecutableInterface {
         }
         // We're now done with this row, so remove it from the map.
         $id_map->deleteDestination($destination_key);
+      }
+      else {
+        // If there is no destination key the import probably failed and we can
+        // remove the row without further action.
+        $source_key = $id_map->currentSource();
+        $id_map->delete($source_key);
       }
 
       // Check for memory exhaustion.
@@ -470,30 +482,44 @@ class MigrateExecutable implements MigrateExecutableInterface {
     }
     if ($pct_memory > $threshold) {
       $this->message->display(
-        $this->t('Memory usage is @usage (@pct% of limit @limit), reclaiming memory.',
-          array('@pct' => round($pct_memory * 100),
-                '@usage' => $this->formatSize($usage),
-                '@limit' => $this->formatSize($this->memoryLimit))),
-        'warning');
+        $this->t(
+          'Memory usage is @usage (@pct% of limit @limit), reclaiming memory.',
+          array(
+            '@pct' => round($pct_memory * 100),
+            '@usage' => $this->formatSize($usage),
+            '@limit' => $this->formatSize($this->memoryLimit),
+          )
+        ),
+        'warning'
+      );
       $usage = $this->attemptMemoryReclaim();
       $pct_memory = $usage / $this->memoryLimit;
       // Use a lower threshold - we don't want to be in a situation where we keep
       // coming back here and trimming a tiny amount
       if ($pct_memory > (0.90 * $threshold)) {
         $this->message->display(
-          $this->t('Memory usage is now @usage (@pct% of limit @limit), not enough reclaimed, starting new batch',
-            array('@pct' => round($pct_memory * 100),
-                  '@usage' => $this->formatSize($usage),
-                  '@limit' => $this->formatSize($this->memoryLimit))),
-          'warning');
+          $this->t(
+            'Memory usage is now @usage (@pct% of limit @limit), not enough reclaimed, starting new batch',
+            array(
+              '@pct' => round($pct_memory * 100),
+              '@usage' => $this->formatSize($usage),
+              '@limit' => $this->formatSize($this->memoryLimit),
+            )
+          ),
+          'warning'
+        );
         return TRUE;
       }
       else {
         $this->message->display(
-          $this->t('Memory usage is now @usage (@pct% of limit @limit), reclaimed enough, continuing',
-            array('@pct' => round($pct_memory * 100),
-                  '@usage' => $this->formatSize($usage),
-                  '@limit' => $this->formatSize($this->memoryLimit))),
+          $this->t(
+            'Memory usage is now @usage (@pct% of limit @limit), reclaimed enough, continuing',
+            array(
+              '@pct' => round($pct_memory * 100),
+              '@usage' => $this->formatSize($usage),
+              '@limit' => $this->formatSize($this->memoryLimit),
+            )
+          ),
           'warning');
         return FALSE;
       }
