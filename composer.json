@@ -26,7 +26,7 @@
         "drupal/composer_deploy": "^1.0"
     },
     "replace": {
-        "drupal/drupal": "~8.1"
+        "drupal/drupal": "~8.2"
     },
     "extra": {
         "installer-paths": {
